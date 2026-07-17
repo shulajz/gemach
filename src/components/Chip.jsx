@@ -6,6 +6,7 @@ const EVENT_TYPE_CLASS = {
   חלבי: 'bg-blue-100 text-blue-800',
   בשרי: 'bg-red-100 text-red-800',
   ניטרלי: 'bg-gray-100 text-gray-800',
+  'לא רלוונטי': 'bg-gray-100 text-gray-700',
 };
 
 const STATUS_CLASS = {
@@ -20,7 +21,8 @@ const getEventTypeClass = (value) => EVENT_TYPE_CLASS[value] || 'bg-gray-100 tex
 const getStatusClass = (value) => STATUS_CLASS[value] || 'bg-gray-100 text-gray-700';
 
 const Chip = ({ children, variant = 'eventType', value }) => {
-  const base = 'inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold';
+  const base =
+    'inline-flex max-w-full items-center rounded-full px-3 py-1 text-sm font-semibold leading-snug break-words text-center';
   const classMap = variant === 'status' ? getStatusClass(value ?? children) : getEventTypeClass(value ?? children);
   return <span className={`${base} ${classMap}`}>{children}</span>;
 };

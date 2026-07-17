@@ -1,4 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+  Outlet,
+} from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -21,42 +26,58 @@ import Reports from './pages/admin/Reports.jsx';
 import GalleryManager from './pages/admin/GalleryManager.jsx';
 import ImportantInfoManager from './pages/admin/ImportantInfoManager.jsx';
 
+const RootLayout = () => (
+  <>
+    <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+    <Outlet />
+  </>
+);
+
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      {
+        path: '/',
+        element: <PublicLayout />,
+        children: [
+          { index: true, element: <LandingPage /> },
+          { path: 'gallery', element: <Gallery /> },
+          { path: 'order-confirmation/:orderId', element: <OrderConfirmation /> },
+          { path: 'order-edit/:orderId', element: <OrderEdit /> },
+        ],
+      },
+      { path: '/admin/login', element: <Login /> },
+      {
+        path: '/admin',
+        element: (
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+          { path: 'dashboard', element: <Dashboard /> },
+          { path: 'inventory', element: <Inventory /> },
+          { path: 'orders', element: <Orders /> },
+          { path: 'orders/:orderId', element: <OrderDetail /> },
+          { path: 'opening-schedule', element: <OpeningSchedule /> },
+          { path: 'calendar', element: <Calendar /> },
+          { path: 'order-conflicts', element: <OrderConflicts /> },
+          { path: 'reports', element: <Reports /> },
+          { path: 'gallery', element: <GalleryManager /> },
+          { path: 'important-info', element: <ImportantInfoManager /> },
+        ],
+      },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+]);
+
 const App = () => (
   <ErrorBoundary>
     <AuthProvider>
-      <BrowserRouter>
-        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-        <Routes>
-          <Route path="/" element={<PublicLayout />}>
-            <Route index element={<LandingPage />} />
-            <Route path="gallery" element={<Gallery />} />
-            <Route path="order-confirmation/:orderId" element={<OrderConfirmation />} />
-            <Route path="order-edit/:orderId" element={<OrderEdit />} />
-          </Route>
-          <Route path="/admin/login" element={<Login />} />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="orders/:orderId" element={<OrderDetail />} />
-            <Route path="opening-schedule" element={<OpeningSchedule />} />
-            <Route path="calendar" element={<Calendar />} />
-            <Route path="order-conflicts" element={<OrderConflicts />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="gallery" element={<GalleryManager />} />
-            <Route path="important-info" element={<ImportantInfoManager />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </AuthProvider>
   </ErrorBoundary>
 );

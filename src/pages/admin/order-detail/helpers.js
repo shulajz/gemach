@@ -1,7 +1,62 @@
 import { format } from 'date-fns';
-import { ORDER_CATEGORIES } from '../../../constants/he.js';
+import { ORDER_CATEGORIES, EVENT_TYPE_NO_UTENSILS } from '../../../constants/he.js';
 
 export const toDateStr = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : (d || '').toString().slice(0, 10));
+
+const normalizeItemsForCompare = (items) =>
+  [...(items || [])]
+    .map((i) => ({
+      itemId: i.itemId,
+      quantity: Number(i.quantity) || 0,
+    }))
+    .filter((i) => i.quantity > 0)
+    .sort((a, b) => String(a.itemId).localeCompare(String(b.itemId)));
+
+const normalizeReturnedForCompare = (items) =>
+  [...(items || [])]
+    .map((i) => ({
+      itemId: i.itemId,
+      quantity: Number(i.quantity) || 0,
+    }))
+    .filter((i) => i.quantity > 0)
+    .sort((a, b) => String(a.itemId).localeCompare(String(b.itemId)));
+
+const normalizeBrokenForCompare = (items) =>
+  [...(items || [])]
+    .map((i) => ({
+      itemId: i.itemId,
+      quantity: Number(i.quantity) || 0,
+      cost: Number(i.cost) || 0,
+    }))
+    .sort((a, b) => String(a.itemId).localeCompare(String(b.itemId)));
+
+/** True when edit form differs from the saved order. */
+export const isOrderFormDirty = (form, order) => {
+  if (!form || !order) return false;
+  if ((form.status || '') !== (order.status || '')) return true;
+  if (Boolean(form.depositPaid) !== Boolean(order.depositPaid)) return true;
+  if ((Number(form.donationAmount) || 0) !== (Number(order.donationAmount) || 0)) return true;
+  if ((form.notes || '') !== (order.notes || '')) return true;
+  if (
+    JSON.stringify(normalizeItemsForCompare(form.items)) !==
+    JSON.stringify(normalizeItemsForCompare(order.items))
+  ) {
+    return true;
+  }
+  if (
+    JSON.stringify(normalizeReturnedForCompare(form.returnedItems)) !==
+    JSON.stringify(normalizeReturnedForCompare(order.returnedItems))
+  ) {
+    return true;
+  }
+  if (
+    JSON.stringify(normalizeBrokenForCompare(form.brokenItems)) !==
+    JSON.stringify(normalizeBrokenForCompare(order.brokenItems))
+  ) {
+    return true;
+  }
+  return false;
+};
 
 export const getReturnedQty = (returnedItems, itemId) =>
   Number((returnedItems || []).find((r) => r.itemId === itemId)?.quantity) || 0;
@@ -9,8 +64,25 @@ export const getReturnedQty = (returnedItems, itemId) =>
 export const hasAnyReturnedItems = (returnedItems) =>
   (returnedItems || []).some((r) => (Number(r.quantity) || 0) > 0);
 
+export const isNoUtensilsEventType = (eventType) => eventType === EVENT_TYPE_NO_UTENSILS;
+
 export const getTabsForEventType = (eventType) =>
   ORDER_CATEGORIES.filter((c) => c.eventType === eventType || c.eventType === null);
+
+export const getItemsForEventType = (items, eventType) => {
+  if (!eventType) return [];
+  if (isNoUtensilsEventType(eventType)) {
+    return items.filter((item) => item.category === 'ניטרלי');
+  }
+  return items.filter((item) => item.category === eventType || item.category === 'ניטרלי');
+};
+
+export const filterQuantitiesForEventType = (quantities, items, eventType) => {
+  const validIds = new Set(getItemsForEventType(items, eventType).map((item) => item.id));
+  return Object.fromEntries(
+    Object.entries(quantities).filter(([id, qty]) => validIds.has(id) && (Number(qty) || 0) > 0),
+  );
+};
 
 export const itemMatchesTab = (item, tabId) => {
   if (tabId === 'plates-dairy') {
@@ -62,5 +134,22 @@ export const buildWhatsAppApprovalUrl = (order) => {
     ? format(order.eventDate instanceof Date ? order.eventDate : new Date(order.eventDate), 'dd/MM/yyyy')
     : '';
   const message = `שלום ${order?.customerName || ''}, ההזמנה שלך בגמ"ח אושרה לתאריך ${eventDate}. תודה רבה!`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
+
+/** WhatsApp deep link to send the private customer edit URL to the order phone. */
+export const buildWhatsAppCustomerEditLinkUrl = (order, editLink) => {
+  const phone = toWhatsAppPhone(order?.phone);
+  if (!phone || !editLink) return '';
+  const eventDate = order?.eventDate
+    ? format(order.eventDate instanceof Date ? order.eventDate : new Date(order.eventDate), 'dd/MM/yyyy')
+    : '';
+  const message = [
+    `שלום ${order?.customerName || ''},`,
+    `קישור לעריכת ההזמנה שלך בגמ"ח (תאריך אירוע: ${eventDate}):`,
+    editLink,
+    '',
+    'הקישור אישי ותקף ל-24 שעות. אין להעביר לאחרים.',
+  ].join('\n');
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };

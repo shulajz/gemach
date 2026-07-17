@@ -10,19 +10,22 @@ const OrderMetaEditCollapse = ({ open, onToggle, form, setForm }) => {
         onClick={onToggle}
         className="mt-4 flex w-full items-center justify-between rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-right font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50"
         aria-expanded={open}
-        aria-label="פתיחה וסגירה של עריכת הזמנה"
+        aria-label="פתיחה וסגירה של עריכת סטטוס הזמנה"
       >
-        <span>עריכת הזמנה</span>
+        <span>עריכת סטטוס הזמנה</span>
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-700 shadow-sm">
           {open ? '▴' : '▾'}
         </span>
       </button>
-      {open && (
-        <div className="mt-3 rounded-xl border-2 border-slate-300 bg-slate-50 p-4">
-          <div className="grid gap-4 md:grid-cols-2">
+      <div
+        className={`mt-3 rounded-xl border-2 border-slate-300 bg-slate-50 p-4 ${open ? '' : 'hidden'}`}
+        hidden={!open}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="block text-sm font-medium">סטטוס</label>
             <select
+              id="order-status"
               value={form.status}
               onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -37,6 +40,7 @@ const OrderMetaEditCollapse = ({ open, onToggle, form, setForm }) => {
           </div>
           <label className="flex items-center gap-2">
             <input
+              id="order-deposit-paid"
               type="checkbox"
               checked={form.depositPaid}
               onChange={(e) => setForm((f) => ({ ...f, depositPaid: e.target.checked }))}
@@ -45,27 +49,35 @@ const OrderMetaEditCollapse = ({ open, onToggle, form, setForm }) => {
             {LABELS.depositPaid}
           </label>
           <div>
-            <label className="block text-sm font-medium">{LABELS.donationAmount}</label>
+            <label htmlFor="order-donation-amount" className="block text-sm font-medium">
+              {LABELS.donationAmount}
+            </label>
             <input
-              type="number"
-              min={0}
-              value={form.donationAmount}
-              onChange={(e) => setForm((f) => ({ ...f, donationAmount: e.target.value }))}
+              id="order-donation-amount"
+              type="text"
+              inputMode="decimal"
+              value={form.donationAmount ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+                setForm((f) => ({ ...f, donationAmount: val }));
+              }}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              aria-label={LABELS.donationAmount}
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium">הערות</label>
+            <label htmlFor="order-notes" className="block text-sm font-medium">הערות</label>
             <textarea
+              id="order-notes"
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
               rows={2}
             />
           </div>
-          </div>
         </div>
-      )}
+      </div>
     </>
   );
 };

@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   Timestamp,
   arrayUnion,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "./config.js";
 import { reserveForOrderDateRange, releaseReservationDateRange } from "./reservations.js";
@@ -103,7 +104,9 @@ export const getOrders = async (filters = {}) => {
     const target = filters.searchDate;
     list = list.filter((o) => toDateStr(o.eventDate) === target);
   }
-  if (filters.includeArchived) {
+  if (filters.includeAll) {
+    // keep archived + active
+  } else if (filters.includeArchived) {
     list = list.filter((o) => o.archived === true);
   } else {
     list = list.filter((o) => !o.archived);
@@ -352,4 +355,29 @@ export const deleteOrder = async (orderId) => {
   }
   const ref = doc(db, ORDERS_COLLECTION, orderId);
   await updateDoc(ref, { status: "בוטל", updatedAt: serverTimestamp() });
+};
+
+/** Hard-delete an archived order and release its reservations. */
+export const permanentlyDeleteArchivedOrder = async (orderId) => {
+  const order = await getOrderById(orderId);
+  if (!order) throw new Error("ההזמנה לא נמצאה");
+  if (!order.archived) {
+    throw new Error("ניתן למחוק לצמיתות רק הזמנות מהארכיון");
+  }
+
+  const eventDate =
+    order.eventDate instanceof Date
+      ? order.eventDate
+      : new Date(order.eventDate);
+  const itemsToRelease = (order.items || [])
+    .filter((i) => (Number(i.quantity) || 0) > 0)
+    .map((i) => ({
+      itemId: i.itemId,
+      quantity: i.quantity,
+    }));
+  if (itemsToRelease.length) {
+    await releaseReservationDateRange(eventDate, itemsToRelease);
+  }
+
+  await deleteDoc(doc(db, ORDERS_COLLECTION, orderId));
 };

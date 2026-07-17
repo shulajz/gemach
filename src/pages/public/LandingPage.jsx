@@ -6,7 +6,14 @@ import {
   EVENT_TYPES,
   ORDER_CATEGORIES,
   LABELS,
+  getEventTypeLabel,
+  EVENT_TYPE_NO_UTENSILS,
 } from "../../constants/he.js";
+import {
+  getItemsForEventType,
+  filterQuantitiesForEventType,
+  isNoUtensilsEventType,
+} from "../admin/order-detail/helpers.js";
 import { useAvailability } from "../../hooks/useAvailability.js";
 import { useImportantInfo } from "../../hooks/useImportantInfo.js";
 import { createOrder } from "../../firebase/orders.js";
@@ -120,12 +127,10 @@ const LandingPage = () => {
     [form.eventType],
   );
 
-  const itemsForEventType = useMemo(() => {
-    if (!form.eventType) return [];
-    return items.filter(
-      (item) => item.category === form.eventType || item.category === "ניטרלי",
-    );
-  }, [items, form.eventType]);
+  const itemsForEventType = useMemo(
+    () => getItemsForEventType(items, form.eventType),
+    [items, form.eventType],
+  );
 
   const currentTab =
     activeTabIndex != null ? tabsForEventType[activeTabIndex] : null;
@@ -147,9 +152,14 @@ const LandingPage = () => {
     return itemsInCurrentTab;
   }, [isSearching, deferredItemSearch, itemsForEventType, itemsInCurrentTab]);
 
-  const hasSelectedItems = useMemo(
-    () => itemsForEventType.some((item) => (quantities[item.id] || 0) > 0),
-    [itemsForEventType, quantities],
+  const hasMeatOrDairyInCart = useMemo(
+    () =>
+      items.some(
+        (item) =>
+          (item.category === "בשרי" || item.category === "חלבי") &&
+          (quantities[item.id] || 0) > 0,
+      ),
+    [items, quantities],
   );
 
   const cartSummary = useMemo(() => {
@@ -166,6 +176,28 @@ const LandingPage = () => {
     : IMPORTANT_INFO.sections.flatMap((section) => section.paragraphs || []);
 
   const handleChange = (field, value) => {
+    if (field === "eventType" && value !== form.eventType) {
+      const nextQuantities = filterQuantitiesForEventType(
+        quantities,
+        items,
+        value,
+      );
+      const nextPending = filterQuantitiesForEventType(
+        pendingQuantities,
+        items,
+        value,
+      );
+      setQuantities(nextQuantities);
+      setPendingQuantities(
+        Object.fromEntries(
+          Object.entries(nextPending).map(([id, qty]) => [
+            id,
+            qty === 0 ? "" : String(qty),
+          ]),
+        ),
+      );
+    }
+
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
     if (field === "phone")
@@ -501,24 +533,37 @@ const LandingPage = () => {
                   <span className="mb-3 block text-sm font-semibold text-gray-800">
                     {LABELS.eventType}
                   </span>
-                  <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
                     {EVENT_TYPES.map((type) => {
                       const isChalav = type === "חלבי";
+                      const isNoUtensils = type === EVENT_TYPE_NO_UTENSILS;
                       const isSelected = form.eventType === type;
-                      const isDisabled = hasSelectedItems && !isSelected;
+                      const isMeatOrDairyType =
+                        type === "בשרי" || type === "חלבי";
+                      const isCurrentMeatOrDairy =
+                        form.eventType === "בשרי" || form.eventType === "חלבי";
+                      const isDisabled =
+                        hasMeatOrDairyInCart &&
+                        isMeatOrDairyType &&
+                        isCurrentMeatOrDairy &&
+                        form.eventType !== type;
                       return (
                         <label
                           key={type}
-                          className={`flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-6 py-3 text-base font-bold transition-all sm:w-auto ${
+                          className={`flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 text-center text-sm font-bold leading-snug transition-all sm:w-auto sm:px-6 sm:text-base ${
                             isDisabled
                               ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
                               : isSelected
-                                ? isChalav
-                                  ? "cursor-pointer border-blue-500 bg-blue-500 text-white shadow-md"
-                                  : "cursor-pointer border-red-500 bg-red-500 text-white shadow-md"
-                                : isChalav
-                                  ? "cursor-pointer border-blue-300 bg-blue-100 text-blue-800 hover:border-blue-400 hover:bg-blue-200"
-                                  : "cursor-pointer border-red-300 bg-red-100 text-red-800 hover:border-red-400 hover:bg-red-200"
+                                ? isNoUtensils
+                                  ? "cursor-pointer border-gray-500 bg-gray-500 text-white shadow-md"
+                                  : isChalav
+                                    ? "cursor-pointer border-blue-500 bg-blue-500 text-white shadow-md"
+                                    : "cursor-pointer border-red-500 bg-red-500 text-white shadow-md"
+                                : isNoUtensils
+                                  ? "cursor-pointer border-gray-300 bg-gray-100 text-gray-800 hover:border-gray-400 hover:bg-gray-200"
+                                  : isChalav
+                                    ? "cursor-pointer border-blue-300 bg-blue-100 text-blue-800 hover:border-blue-400 hover:bg-blue-200"
+                                    : "cursor-pointer border-red-300 bg-red-100 text-red-800 hover:border-red-400 hover:bg-red-200"
                           }`}
                         >
                           <input
@@ -531,20 +576,31 @@ const LandingPage = () => {
                               !isDisabled && handleChange("eventType", type)
                             }
                             className="sr-only"
-                            aria-label={type}
+                            aria-label={getEventTypeLabel(type)}
                             aria-disabled={isDisabled}
                           />
-                          <span>{type}</span>
+                          <span className="break-words">{getEventTypeLabel(type)}</span>
                         </label>
                       );
                     })}
                   </div>
-                  {hasSelectedItems && (
+                  {hasMeatOrDairyInCart &&
+                    (form.eventType === "בשרי" ||
+                      form.eventType === "חלבי") && (
+                      <p
+                        className="mt-1.5 text-sm font-medium text-amber-700"
+                        role="status"
+                      >
+                        לא ניתן להחליף בין בשרי לחלבי לאחר הוספת כלים
+                      </p>
+                    )}
+                  {isNoUtensilsEventType(form.eventType) && (
                     <p
-                      className="mt-1.5 text-sm font-medium text-amber-700"
+                      className="mt-1.5 text-sm font-medium text-gray-600"
                       role="status"
                     >
-                      לא ניתן להחליף סוג אירוע (בשרי/חלבי) לאחר הוספת פריטים
+                      ניתן לבחור פריטי עיצוב ואביזרים בלבד — ללא צלחות, סכו&quot;ם
+                      וכוסות
                     </p>
                   )}
                   {errors.eventType && (
@@ -968,7 +1024,9 @@ const LandingPage = () => {
                     <dt className="font-medium text-gray-600">
                       {LABELS.eventType}
                     </dt>
-                    <dd className="text-gray-900">{form.eventType}</dd>
+                    <dd className="text-gray-900">
+                      {getEventTypeLabel(form.eventType)}
+                    </dd>
                   </div>
                 </dl>
               </div>

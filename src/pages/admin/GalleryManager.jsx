@@ -193,7 +193,7 @@ const GalleryManager = () => {
   );
 
   const renderEditor = () => (
-    <div className="rounded-2xl border-2 border-primary-200 bg-primary-50/30 p-6">
+    <div className="rounded-2xl border-2 border-primary-200 bg-primary-50/30 p-4 sm:p-6">
       <h2 className="mb-4 text-lg font-bold text-gray-900">
         {isEditing ? 'עריכת תמונה' : isFolderMode ? 'ייבוא תמונות מתיקייה' : 'תמונה חדשה'}
       </h2>
@@ -248,8 +248,8 @@ const GalleryManager = () => {
           </p>
         )}
       </div>
-      <div className="mt-4 flex gap-2">
-        <Button onClick={handleSave} disabled={saving}>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
           {saving ? (
             <span className="inline-flex items-center gap-2">
               <Spinner className="h-4 w-4" />
@@ -261,7 +261,7 @@ const GalleryManager = () => {
             'שמירה'
           )}
         </Button>
-        <Button variant="secondary" onClick={() => setEditingId(undefined)}>
+        <Button variant="secondary" onClick={() => setEditingId(undefined)} className="w-full sm:w-auto">
           ביטול
         </Button>
       </div>

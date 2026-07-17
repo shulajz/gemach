@@ -1,4 +1,10 @@
-export const EVENT_TYPES = ['בשרי', 'חלבי'];
+export const EVENT_TYPE_NO_UTENSILS = 'לא רלוונטי';
+export const EVENT_TYPES = ['בשרי', 'חלבי', EVENT_TYPE_NO_UTENSILS];
+
+export const getEventTypeLabel = (type) => {
+  if (type === EVENT_TYPE_NO_UTENSILS) return 'לא רלוונטי – לא לוקח כלים';
+  return type || '';
+};
 export const CATEGORIES = ['בשרי', 'חלבי', 'ניטרלי'];
 export const ORDER_STATUSES = ['ממתין', 'אושר', 'נאסף', 'הוחזר', 'בוטל'];
 
@@ -73,7 +79,7 @@ export const LABELS = {
   phone: 'מספר טלפון',
   eventDate: 'תאריך של האירוע',
   city: 'עיר מגורים',
-  eventType: 'האירוע בשרי או חלבי?',
+  eventType: 'סוג האירוע',
   itemName: 'שם הפריט',
   category: 'קטגוריה',
   maxQuantity: 'כמות מקסימלית',
@@ -104,6 +110,21 @@ export const LABELS = {
   showArchived: 'הצג ארכיון',
   moveToArchive: 'העבר לארכיון',
   restoreFromArchive: 'שחזר מארכיון',
+  deleteFromArchive: 'מחק מהארכיון',
+  deleteFromArchiveConfirmTitle: 'מחיקה לצמיתות מהארכיון?',
+  deleteFromArchiveConfirmMessage:
+    'ההזמנה תימחק לצמיתות ולא ניתן יהיה לשחזר אותה. פעולה זו מיועדת רק להזמנות בארכיון.',
+  deleteFromArchiveSuccess: 'ההזמנה נמחקה מהארכיון',
+  unsavedChangesTitle: 'יש שינויים שלא נשמרו',
+  unsavedChangesMessage: 'לשמור את השינויים לפני היציאה?',
+  unsavedSave: 'שמירה',
+  unsavedStay: 'המשך עריכה',
+  unsavedDiscard: 'לצאת בלי לשמור',
+  unsavedDiscardChanges: 'ביטול שינויים',
+  unsavedReminder: 'יש שינויים שלא נשמרו — לחצי שמירה כדי לעדכן',
+  saveOrder: 'שמירה',
+  savingOrder: 'שומר...',
+  cancelEdit: 'ביטול שינויים',
   searchByName: 'חיפוש לפי שם',
   searchItems: 'חיפוש פריט',
   searchItemsPlaceholder: 'למשל: צלחות',
@@ -111,3 +132,6 @@ export const LABELS = {
 };
 
 export const PICKUP_LOCATION = 'רחוב דרך למרחב 36 (בליבא בעי בקומה התחתונה)';
+
+/** קישור לקבוצת הוואטסאפ של הגמ״ח */
+export const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/EW7AX8CH64tKvWn9wEWT7X';

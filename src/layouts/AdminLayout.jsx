@@ -80,7 +80,7 @@ const AdminLayout = () => {
           </div>
         </nav>
       </header>
-      <main className="admin-content-layer mx-auto max-w-6xl px-4 py-4 md:py-8">
+      <main className="admin-content-layer mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-8">
         <Outlet />
       </main>
     </div>

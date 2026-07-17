@@ -1,4 +1,11 @@
-import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  runTransaction,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { db } from './config.js';
 import { getReservationWindowForEvent } from './openingSchedule.js';
 
@@ -64,6 +71,17 @@ export const getReservationsForDate = async (dateStr) => {
   if (!snap.exists()) return {};
   const data = snap.data();
   return data.itemReservations || {};
+};
+
+/**
+ * All reservation day docs: [{ date, itemReservations }].
+ */
+export const getAllReservationDocs = async () => {
+  const snapshot = await getDocs(collection(db, RESERVATIONS_COLLECTION));
+  return snapshot.docs.map((d) => ({
+    date: d.id,
+    itemReservations: d.data()?.itemReservations || {},
+  }));
 };
 
 /**

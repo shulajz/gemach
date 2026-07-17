@@ -1,33 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getOrders } from '../../firebase/orders.js';
+import { getItems } from '../../firebase/items.js';
+import { getAllReservationDocs } from '../../firebase/reservations.js';
+import { computeHighDemandItems } from '../../utils/highDemandItems.js';
 import Card from '../../components/Card.jsx';
 import Spinner from '../../components/Spinner.jsx';
 
 const Reports = () => {
   const [orders, setOrders] = useState([]);
+  const [items, setItems] = useState([]);
+  const [reservationDocs, setReservationDocs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getOrders({})
-      .then(setOrders)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    Promise.all([getOrders({}), getItems(), getAllReservationDocs()])
+      .then(([ordersList, itemsList, reservationsList]) => {
+        if (cancelled) return;
+        setOrders(ordersList || []);
+        setItems(itemsList || []);
+        setReservationDocs(reservationsList || []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const brokenItemsReport = orders.filter((o) => (o.brokenItems || []).length > 0).flatMap((o) =>
-    (o.brokenItems || []).map((b) => ({ orderId: o.id, customerName: o.customerName, ...b }))
+  const brokenItemsReport = orders
+    .filter((o) => (o.brokenItems || []).length > 0)
+    .flatMap((o) =>
+      (o.brokenItems || []).map((b) => ({
+        orderId: o.id,
+        customerName: o.customerName,
+        ...b,
+      })),
+    );
+  const totalDonations = orders.reduce(
+    (sum, o) => sum + (Number(o.donationAmount) || 0),
+    0,
   );
-  const totalDonations = orders.reduce((sum, o) => sum + (Number(o.donationAmount) || 0), 0);
-  const itemCounts = {};
-  orders.forEach((o) => {
-    (o.items || []).forEach((line) => {
-      const name = line.itemName || line.itemId;
-      itemCounts[name] = (itemCounts[name] || 0) + (line.quantity || 0);
-    });
-  });
-  const popularItems = Object.entries(itemCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+
+  const highDemandItems = useMemo(
+    () => computeHighDemandItems(items, reservationDocs),
+    [items, reservationDocs],
+  );
 
   if (loading) {
     return (
@@ -39,7 +58,7 @@ const Reports = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-gray-900">דוחות</h1>
+      <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">דוחות</h1>
 
       <Card>
         <h2 className="mb-4 text-xl font-bold text-gray-900">כלים שבורים (150% ממחיר)</h2>
@@ -77,16 +96,56 @@ const Reports = () => {
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-xl font-bold text-gray-900">פריטים פופולריים</h2>
-        <ul className="space-y-2">
-          {popularItems.map((item) => (
-            <li key={item.name} className="flex justify-between">
-              <span>{item.name}</span>
-              <span>{item.count} פעמים</span>
-            </li>
-          ))}
-          {popularItems.length === 0 && <li className="text-gray-600">אין נתונים</li>}
-        </ul>
+        <h2 className="mb-1 text-xl font-bold text-gray-900">פריטים פופולריים / מבוקשים</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          כמה פעמים כל פריט הגיע ל־0 זמינות (כל המלאי שמור לתאריך מסוים). ככל שהמספר גבוה יותר —
+          הפריט מבוקש יותר יחסית למלאי.
+        </p>
+
+        {highDemandItems.length === 0 ? (
+          <p className="text-gray-600">אין עדיין ימים שבהם פריטים הגיעו ל־0 זמינות</p>
+        ) : (
+          <>
+            <div className="space-y-2 md:hidden">
+              {highDemandItems.map((item) => (
+                <div
+                  key={item.itemId}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900">{item.name}</p>
+                    <p className="text-xs text-gray-500">מלאי מקסימלי: {item.maxQuantity}</p>
+                  </div>
+                  <div className="shrink-0 text-left">
+                    <p className="text-lg font-bold text-teal-700">{item.soldOutDays}</p>
+                    <p className="text-xs text-gray-500">ימים ב־0</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-2xl border border-gray-200 md:block">
+              <table className="w-full text-right">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
+                    <th className="p-3">פריט</th>
+                    <th className="p-3">מלאי מקסימלי</th>
+                    <th className="p-3">ימים שהגיע ל־0</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {highDemandItems.map((item) => (
+                    <tr key={item.itemId} className="border-b border-gray-100 hover:bg-teal-50/50">
+                      <td className="p-3 font-medium text-gray-900">{item.name}</td>
+                      <td className="p-3">{item.maxQuantity}</td>
+                      <td className="p-3 font-semibold text-teal-700">{item.soldOutDays}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );

@@ -1,17 +1,28 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { getOrders } from "../../firebase/orders.js";
+import {
+  getOrders,
+  updateOrder,
+  permanentlyDeleteArchivedOrder,
+} from "../../firebase/orders.js";
 import { getItems } from "../../firebase/items.js";
-import { ORDER_STATUSES, LABELS } from "../../constants/he.js";
+import { ORDER_STATUSES, LABELS, EVENT_TYPES } from "../../constants/he.js";
+import { canPermanentlyDeleteFromArchive } from "../../constants/adminPrivileges.js";
 import { exportOrdersMatrixExcel } from "../../utils/exportOrdersMatrixExcel.js";
+import { getHebrewError } from "../../utils/errorsHe.js";
 import { format } from "date-fns";
 import Card from "../../components/Card.jsx";
 import Spinner from "../../components/Spinner.jsx";
 import Chip from "../../components/Chip.jsx";
+import Button from "../../components/Button.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const Orders = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canDeleteFromArchive = canPermanentlyDeleteFromArchive(user);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchName, setSearchName] = useState("");
@@ -23,18 +34,25 @@ const Orders = () => {
   const [sortKey, setSortKey] = useState("eventDate");
   const [sortDir, setSortDir] = useState("desc");
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [actionBusyId, setActionBusyId] = useState("");
+  const [orderPendingDelete, setOrderPendingDelete] = useState(null);
+  const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 
+  const advancedFilterCount = [
+    searchPhone,
+    searchDate,
+    filterStatus,
+    filterEventType,
+    showArchived,
+  ].filter(Boolean).length;
+
+  // Load orders once. All search/filter is client-side — no DB hit per keystroke.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getOrders({
-      searchDate: searchDate || undefined,
-      status: filterStatus || undefined,
-      eventType: filterEventType || undefined,
-      includeArchived: showArchived,
-    })
+    getOrders({ includeAll: true })
       .then((list) => {
-        if (!cancelled) setOrders(list);
+        if (!cancelled) setOrders(list || []);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -42,12 +60,15 @@ const Orders = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchDate, filterStatus, filterEventType, showArchived]);
+  }, []);
 
   const uniqueNames = useMemo(() => {
-    const names = [...new Set(orders.map((o) => o.customerName).filter(Boolean))];
+    const source = showArchived
+      ? orders.filter((o) => o.archived === true)
+      : orders.filter((o) => !o.archived);
+    const names = [...new Set(source.map((o) => o.customerName).filter(Boolean))];
     return names.sort((a, b) => (a || "").localeCompare(b || ""));
-  }, [orders]);
+  }, [orders, showArchived]);
 
   const toggleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -58,14 +79,36 @@ const Orders = () => {
   };
 
   const filteredAndSorted = useMemo(() => {
-    let list = orders;
+    let list = showArchived
+      ? orders.filter((o) => o.archived === true)
+      : orders.filter((o) => !o.archived);
+
     if (searchName) {
       list = list.filter((o) => (o.customerName || "").trim() === searchName.trim());
     }
     if (searchPhone) {
       const digits = (searchPhone || "").replace(/\D/g, "");
-      list = list.filter((o) => (o.phone || "").replace(/\D/g, "").includes(digits));
+      if (digits) {
+        list = list.filter((o) =>
+          (o.phone || "").replace(/\D/g, "").includes(digits),
+        );
+      }
     }
+    if (searchDate) {
+      list = list.filter((o) => {
+        if (!o.eventDate) return false;
+        const d =
+          o.eventDate instanceof Date ? o.eventDate : new Date(o.eventDate);
+        return format(d, "yyyy-MM-dd") === searchDate;
+      });
+    }
+    if (filterStatus) {
+      list = list.filter((o) => o.status === filterStatus);
+    }
+    if (filterEventType) {
+      list = list.filter((o) => o.eventType === filterEventType);
+    }
+
     list = [...list].sort((a, b) => {
       let va = a[sortKey];
       let vb = b[sortKey];
@@ -80,10 +123,50 @@ const Orders = () => {
       return sortDir === "desc" ? -cmp : cmp;
     });
     return list;
-  }, [orders, searchName, searchPhone, sortKey, sortDir]);
+  }, [
+    orders,
+    showArchived,
+    searchName,
+    searchPhone,
+    searchDate,
+    filterStatus,
+    filterEventType,
+    sortKey,
+    sortDir,
+  ]);
 
   const handleRowClick = (orderId) => {
     navigate(`/admin/orders/${orderId}`);
+  };
+
+  const handleRestoreFromArchive = async (order, event) => {
+    event?.stopPropagation?.();
+    setActionBusyId(order.id);
+    try {
+      await updateOrder(order.id, { archived: false }, order);
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      toast.success("ההזמנה שוחזרה מהארכיון");
+    } catch (e) {
+      toast.error(getHebrewError(e));
+    } finally {
+      setActionBusyId("");
+    }
+  };
+
+  const handleConfirmDeleteFromArchive = async () => {
+    if (!orderPendingDelete) return;
+    const order = orderPendingDelete;
+    setOrderPendingDelete(null);
+    setActionBusyId(order.id);
+    try {
+      await permanentlyDeleteArchivedOrder(order.id);
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      toast.success(LABELS.deleteFromArchiveSuccess);
+    } catch (e) {
+      toast.error(getHebrewError(e));
+    } finally {
+      setActionBusyId("");
+    }
   };
 
   const exportOrdersToExcel = async () => {
@@ -98,6 +181,54 @@ const Orders = () => {
     } finally {
       setExportingExcel(false);
     }
+  };
+
+  const renderArchiveActions = (order, { stacked = false } = {}) => {
+    if (!showArchived) return null;
+    const busy = actionBusyId === order.id;
+    return (
+      <div
+        className={
+          stacked
+            ? "flex w-full flex-col gap-2"
+            : "flex flex-wrap items-center justify-end gap-2"
+        }
+      >
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={(e) => handleRestoreFromArchive(order, e)}
+          disabled={busy}
+          className={
+            stacked
+              ? "w-full min-h-11 px-4 py-3 text-base"
+              : "min-h-10 px-3 py-2 text-sm"
+          }
+          ariaLabel={`${LABELS.restoreFromArchive} ${order.customerName || ""}`}
+        >
+          {LABELS.restoreFromArchive}
+        </Button>
+        {canDeleteFromArchive && (
+          <Button
+            type="button"
+            variant="danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOrderPendingDelete(order);
+            }}
+            disabled={busy}
+            className={
+              stacked
+                ? "w-full min-h-11 px-4 py-3 text-base"
+                : "min-h-10 px-3 py-2 text-sm"
+            }
+            ariaLabel={`${LABELS.deleteFromArchive} ${order.customerName || ""}`}
+          >
+            {LABELS.deleteFromArchive}
+          </Button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -115,7 +246,7 @@ const Orders = () => {
         </button>
       </div>
       <Card>
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="mb-6 space-y-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="search-name" className="text-sm font-medium text-gray-700">
               חיפוש לפי שם
@@ -135,79 +266,114 @@ const Orders = () => {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="search-phone" className="text-sm font-medium text-gray-700">
-              חיפוש לפי טלפון
-            </label>
-            <input
-              id="search-phone"
-              type="text"
-              placeholder="052-1234567"
-              value={searchPhone}
-              onChange={(e) => setSearchPhone(e.target.value)}
-              className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
-              aria-label="חיפוש לפי טלפון"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="search-date" className="text-sm font-medium text-gray-700">
-              תאריך
-            </label>
-            <input
-              id="search-date"
-              type="date"
-              value={searchDate}
-              onChange={(e) => setSearchDate(e.target.value)}
-              className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
-              aria-label="חיפוש לפי תאריך"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="filter-status" className="text-sm font-medium text-gray-700">
-              סטטוס
-            </label>
-            <select
-              id="filter-status"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
-              aria-label="סינון סטטוס"
-            >
-              <option value="">כל הסטטוסים</option>
-              {ORDER_STATUSES.filter((s) => s !== "בוטל").map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="filter-event-type" className="text-sm font-medium text-gray-700">
-              סוג אירוע
-            </label>
-            <select
-              id="filter-event-type"
-              value={filterEventType}
-              onChange={(e) => setFilterEventType(e.target.value)}
-              className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
-              aria-label="סינון סוג אירוע"
-            >
-              <option value="">כל הסוגים</option>
-              <option value="בשרי">בשרי</option>
-              <option value="חלבי">חלבי</option>
-            </select>
-          </div>
-          <div className="flex flex-col justify-end">
-            <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 border-gray-200 bg-gray-50 px-3 py-3" title="הצג הזמנות בארכיון">
+
+          <button
+            type="button"
+            onClick={() => setAdvancedSearchOpen((open) => !open)}
+            className="flex min-h-11 w-full items-center justify-between rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-3 text-right text-sm font-semibold text-gray-800 transition-colors hover:border-teal-300 hover:bg-teal-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 md:hidden"
+            aria-expanded={advancedSearchOpen}
+            aria-controls="orders-advanced-search"
+            aria-label="חיפוש מתקדם"
+          >
+            <span className="inline-flex items-center gap-2">
+              חיפוש מתקדם
+              {advancedFilterCount > 0 && (
+                <span className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-teal-600 px-1.5 text-xs font-bold text-white">
+                  {advancedFilterCount}
+                </span>
+              )}
+            </span>
+            <span className="text-gray-500" aria-hidden="true">
+              {advancedSearchOpen ? "▴" : "▾"}
+            </span>
+          </button>
+
+          <div
+            id="orders-advanced-search"
+            className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 ${
+              advancedSearchOpen ? "grid" : "hidden md:grid"
+            }`}
+          >
+            <div className="flex flex-col gap-1">
+              <label htmlFor="search-phone" className="text-sm font-medium text-gray-700">
+                חיפוש לפי טלפון
+              </label>
               <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(e) => setShowArchived(e.target.checked)}
-                className="rounded text-teal-600"
-                aria-label="הצג ארכיון"
+                id="search-phone"
+                type="text"
+                placeholder="052-1234567"
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                aria-label="חיפוש לפי טלפון"
               />
-              <span className="text-sm font-medium text-gray-700">{LABELS.showArchived}</span>
-            </label>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="search-date" className="text-sm font-medium text-gray-700">
+                תאריך
+              </label>
+              <input
+                id="search-date"
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                aria-label="חיפוש לפי תאריך"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="filter-status" className="text-sm font-medium text-gray-700">
+                סטטוס
+              </label>
+              <select
+                id="filter-status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                aria-label="סינון סטטוס"
+              >
+                <option value="">כל הסטטוסים</option>
+                {ORDER_STATUSES.filter((s) => s !== "בוטל").map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="filter-event-type" className="text-sm font-medium text-gray-700">
+                סוג אירוע
+              </label>
+              <select
+                id="filter-event-type"
+                value={filterEventType}
+                onChange={(e) => setFilterEventType(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-300 bg-white px-3 py-3 text-base focus:border-teal-500 focus:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                aria-label="סינון סוג אירוע"
+              >
+                <option value="">כל הסוגים</option>
+                {EVENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type === "לא רלוונטי" ? "לא רלוונטי – לא לוקח כלים" : type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col justify-end">
+              <label
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 border-gray-200 bg-gray-50 px-3 py-3"
+                title="הצג הזמנות בארכיון"
+              >
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="rounded text-teal-600"
+                  aria-label="הצג ארכיון"
+                />
+                <span className="text-sm font-medium text-gray-700">{LABELS.showArchived}</span>
+              </label>
+            </div>
           </div>
         </div>
         {loading ? (
@@ -218,27 +384,37 @@ const Orders = () => {
           <>
             <div className="space-y-3 md:hidden">
               {filteredAndSorted.map((o) => (
-                <button
+                <div
                   key={o.id}
-                  type="button"
-                  onClick={() => handleRowClick(o.id)}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-right shadow-sm transition-colors hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  className="rounded-xl border border-gray-200 bg-white p-4 text-right shadow-sm"
                 >
-                  <p className="font-semibold text-gray-900">{o.customerName}</p>
-                  <p className="mt-1 text-sm text-gray-600">{o.phone}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="text-sm text-gray-700">
-                      {o.eventDate
-                        ? format(
-                            o.eventDate instanceof Date ? o.eventDate : new Date(o.eventDate),
-                            "dd/MM/yyyy"
-                          )
-                        : "-"}
-                    </span>
-                    <Chip variant="eventType" value={o.eventType}>{o.eventType}</Chip>
-                    <Chip variant="status" value={o.status}>{o.status}</Chip>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRowClick(o.id)}
+                    className="w-full text-right transition-colors hover:text-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    aria-label={`פרטי הזמנה ${o.customerName || ""}`}
+                  >
+                    <p className="font-semibold text-gray-900">{o.customerName}</p>
+                    <p className="mt-1 text-sm text-gray-600">{o.phone}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-gray-700">
+                        {o.eventDate
+                          ? format(
+                              o.eventDate instanceof Date ? o.eventDate : new Date(o.eventDate),
+                              "dd/MM/yyyy"
+                            )
+                          : "-"}
+                      </span>
+                      <Chip variant="eventType" value={o.eventType}>{o.eventType}</Chip>
+                      <Chip variant="status" value={o.status}>{o.status}</Chip>
+                    </div>
+                  </button>
+                  {showArchived && (
+                    <div className="mt-3 border-t border-gray-100 pt-3">
+                      {renderArchiveActions(o, { stacked: true })}
+                    </div>
+                  )}
+                </div>
               ))}
               {filteredAndSorted.length === 0 && (
                 <p className="py-4 text-center text-gray-600">לא נמצאו הזמנות</p>
@@ -298,6 +474,9 @@ const Orders = () => {
                       סטטוס {sortKey === "status" ? (sortDir === "desc" ? "▼" : "▲") : ""}
                     </button>
                   </th>
+                  {showArchived && (
+                    <th className="p-2 whitespace-nowrap">פעולות</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -336,6 +515,15 @@ const Orders = () => {
                         {o.status}
                       </Chip>
                     </td>
+                    {showArchived && (
+                      <td
+                        className="p-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {renderArchiveActions(o)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -347,6 +535,20 @@ const Orders = () => {
           </>
         )}
       </Card>
+      <ConfirmDialog
+        isOpen={!!orderPendingDelete}
+        title={LABELS.deleteFromArchiveConfirmTitle}
+        message={
+          orderPendingDelete
+            ? `${LABELS.deleteFromArchiveConfirmMessage} (${orderPendingDelete.customerName || "ללא שם"})`
+            : LABELS.deleteFromArchiveConfirmMessage
+        }
+        confirmLabel={LABELS.deleteFromArchive}
+        cancelLabel="ביטול"
+        variant="danger"
+        onConfirm={handleConfirmDeleteFromArchive}
+        onCancel={() => setOrderPendingDelete(null)}
+      />
     </div>
   );
 };

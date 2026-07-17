@@ -166,7 +166,9 @@ const collectOrdersConflicts = (orders, itemById) => {
         totals[line.itemId].perOrder.push({
           orderId: order.id,
           customerName: order.customerName || "ללא שם",
+          phone: order.phone || "",
           eventDate: toDateStr(order.eventDate),
+          createdAt: order.createdAt || null,
           qty,
         });
       });
@@ -187,7 +189,9 @@ const collectOrdersConflicts = (orders, itemById) => {
       .map((o) => ({
         id: o.id,
         customerName: o.customerName || "ללא שם",
+        phone: o.phone || "",
         eventDate: toDateStr(o.eventDate),
+        createdAt: o.createdAt || null,
         status: o.status,
       }));
 
@@ -358,12 +362,23 @@ export const applyOpeningScheduleChanges = async ({
 export const describeConflictsInHebrew = (conflicts) => {
   if (!conflicts?.length) return [];
   const formatDate = (value) => {
+    if (!value) return "לא ידוע";
     const date = toDate(value);
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "לא ידוע";
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  const formatOrderDetails = (order) => {
+    const phone = (order.phone || "").trim() || "לא ידוע";
+    return [
+      `• שם: ${order.customerName || "ללא שם"}`,
+      `  טלפון: ${phone}`,
+      `  תאריך ביצוע ההזמנה: ${formatDate(order.createdAt)}`,
+      `  תאריך אירוע: ${formatDate(order.eventDate)}`,
+    ].join("\n");
   };
 
   return conflicts.map((conflict) => {
@@ -379,6 +394,10 @@ export const describeConflictsInHebrew = (conflicts) => {
       uniqueOrders.length >= 2
         ? `הזמנה של ${uniqueOrders[0].customerName} (${formatDate(uniqueOrders[0].eventDate)}) מתנגשת עם הזמנה של ${uniqueOrders[1].customerName} (${formatDate(uniqueOrders[1].eventDate)}).`
         : `זוהתה התנגשות בחלון ${conflict.slotKey}.`;
+    const ordersDetails = [
+      "פרטי ההזמנות המעורבות:",
+      ...uniqueOrders.map((order) => formatOrderDetails(order)),
+    ];
     const itemsText = conflict.items.map((item) => {
       const topTwo = [];
       const seenOrderIds = new Set();
@@ -393,7 +412,12 @@ export const describeConflictsInHebrew = (conflicts) => {
           : `${topTwo[0]?.customerName || "לקוח"} הזמין ${topTwo[0]?.qty || 0}`;
       return `• ${item.itemName} - ${details}. סה"כ יש ${item.maxQuantity}.`;
     });
-    return [pairText, "המוצרים הבאים מתנגשים:", ...itemsText].join("\n");
+    return [
+      pairText,
+      ...ordersDetails,
+      "המוצרים הבאים מתנגשים:",
+      ...itemsText,
+    ].join("\n");
   });
 };
 

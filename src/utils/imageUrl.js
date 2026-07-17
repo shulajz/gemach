@@ -8,10 +8,17 @@ export const getGoogleDriveId = (url) => {
     /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/,
   );
   if (fileMatch) return fileMatch[1];
-  const openMatch = trimmed.match(
-    /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/,
+  const lhMatch = trimmed.match(
+    /lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/,
   );
-  if (openMatch) return openMatch[1];
+  if (lhMatch) return lhMatch[1];
+  if (
+    trimmed.includes("drive.google.com") ||
+    trimmed.includes("googleusercontent.com")
+  ) {
+    const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idMatch) return idMatch[1];
+  }
   return null;
 };
 

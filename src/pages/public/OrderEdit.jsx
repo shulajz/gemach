@@ -24,7 +24,10 @@ import ItemImage from "../../components/ItemImage.jsx";
 import {
   getTabsForEventType,
   itemMatchesTab,
+  getItemsForEventType,
+  filterQuantitiesForEventType,
 } from "../admin/order-detail/helpers.js";
+import { EVENT_TYPES, getEventTypeLabel, EVENT_TYPE_NO_UTENSILS } from "../../constants/he.js";
 
 const toDateStr = (d) =>
   d instanceof Date ? d.toISOString().slice(0, 10) : (d || "").toString().slice(0, 10);
@@ -113,12 +116,10 @@ const OrderEdit = () => {
     }
   }, [tabsForEventType, activeTabIndex]);
 
-  const itemsForEventType = useMemo(() => {
-    if (!form.eventType) return [];
-    return items.filter(
-      (item) => item.category === form.eventType || item.category === "ניטרלי",
-    );
-  }, [items, form.eventType]);
+  const itemsForEventType = useMemo(
+    () => getItemsForEventType(items, form.eventType),
+    [items, form.eventType],
+  );
 
   const getItemsForTab = (tab) => {
     if (!tab || !form.eventType) return [];
@@ -272,6 +273,15 @@ const OrderEdit = () => {
 
   const handleChange = (field, value) => {
     const nextValue = field === "phone" ? formatIsraeliPhone(value) : value;
+    if (field === "eventType" && nextValue !== form.eventType) {
+      setQuantities((prev) => filterQuantitiesForEventType(prev, items, nextValue));
+      setPendingQuantities((prev) => {
+        const filtered = filterQuantitiesForEventType(prev, items, nextValue);
+        return Object.fromEntries(
+          Object.entries(filtered).map(([id, qty]) => [id, qty === 0 ? "" : String(qty)]),
+        );
+      });
+    }
     setForm((prev) => ({ ...prev, [field]: nextValue }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
   };
@@ -368,29 +378,43 @@ const OrderEdit = () => {
           />
           <div className="md:col-span-2">
             <label className="mb-3 block text-sm font-semibold text-gray-800">
-              האירוע בשרי או חלבי?
+              סוג האירוע
             </label>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              {["בשרי", "חלבי"].map((type) => (
-                <label
-                  key={type}
-                  className={`flex w-full cursor-pointer items-center justify-center rounded-xl border-2 px-6 py-3 font-bold sm:w-auto ${
-                    form.eventType === type
-                      ? "border-teal-500 bg-teal-500 text-white"
-                      : "border-teal-200 bg-teal-50 text-teal-900"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="eventType"
-                    value={type}
-                    checked={form.eventType === type}
-                    onChange={() => handleChange("eventType", type)}
-                    className="sr-only"
-                  />
-                  {type}
-                </label>
-              ))}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+              {EVENT_TYPES.map((type) => {
+                const isChalav = type === "חלבי";
+                const isNoUtensils = type === EVENT_TYPE_NO_UTENSILS;
+                const isSelected = form.eventType === type;
+                return (
+                  <label
+                    key={type}
+                    className={`flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border-2 px-3 py-3 text-center text-sm font-bold leading-snug sm:w-auto sm:px-6 ${
+                      isSelected
+                        ? isNoUtensils
+                          ? "border-gray-500 bg-gray-500 text-white"
+                          : isChalav
+                            ? "border-blue-500 bg-blue-500 text-white"
+                            : "border-red-500 bg-red-500 text-white"
+                        : isNoUtensils
+                          ? "border-gray-300 bg-gray-100 text-gray-800"
+                          : isChalav
+                            ? "border-blue-200 bg-blue-50 text-blue-900"
+                            : "border-red-200 bg-red-50 text-red-900"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="eventType"
+                      value={type}
+                      checked={isSelected}
+                      onChange={() => handleChange("eventType", type)}
+                      className="sr-only"
+                      aria-label={getEventTypeLabel(type)}
+                    />
+                    <span className="break-words">{getEventTypeLabel(type)}</span>
+                  </label>
+                );
+              })}
             </div>
             {errors.eventType && (
               <p className="mt-1.5 text-sm font-medium text-red-600">{errors.eventType}</p>

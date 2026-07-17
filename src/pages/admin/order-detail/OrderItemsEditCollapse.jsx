@@ -37,36 +37,89 @@ const OrderItemsEditCollapse = ({
         </span>
       </button>
       {open && (
-        <div className="mt-3 rounded-xl border-2 border-slate-300 bg-slate-50 p-4">
+        <div className="mt-3 rounded-xl border-2 border-slate-300 bg-slate-50 p-3 sm:p-4">
           <h2 className="mb-3 font-semibold text-slate-900">פריטים בהזמנה</h2>
-          <p className="mb-3 text-sm text-slate-700">לשינוי כמות או הוספת פריט – השתמשו ברשימת הפריטים למטה.</p>
+          <p className="mb-3 text-sm leading-relaxed text-slate-700">
+            אפשר לעדכן כמות ישירות כאן, להסיר פריט, או להוסיף פריטים חדשים מהרשימה למטה.
+          </p>
           <ul className="space-y-3" role="list">
             {form.items.map((line, index) => {
               const it = items.find((i) => i.id === line.itemId);
               const av = availability(line.itemId);
+              const qty = Number(line.quantity) || 0;
+              const handleSetQty = (nextQty) => {
+                const clamped = Math.max(1, Math.min(av.available, Number(nextQty) || 1));
+                addOrUpdateItemInForm(line.itemId, line.itemName, clamped);
+                setForm((f) => ({
+                  ...f,
+                  addItemQuantities: {
+                    ...(f.addItemQuantities || {}),
+                    [line.itemId]: String(clamped),
+                  },
+                }));
+              };
               return (
                 <li
                   key={`${line.itemId}-${index}`}
-                  className="flex flex-col gap-3 rounded-xl border-2 border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4"
+                  className="flex flex-col gap-3 rounded-xl border-2 border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-4"
                 >
                   <ItemImage
                     src={it?.imageUrl}
                     alt={line.itemName}
-                    className="h-16 w-16 flex-shrink-0 self-end rounded-lg object-cover border border-slate-200 sm:self-auto"
+                    className="mx-auto h-16 w-16 flex-shrink-0 rounded-lg border border-slate-200 object-cover sm:mx-0"
                   />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-900">{line.itemName}</p>
+                  <div className="min-w-0 flex-1 text-center sm:text-right">
+                    <p className="break-words font-semibold text-slate-900">{line.itemName}</p>
                     <p className="text-sm text-slate-700">
-                      כמות בהזמנה: <strong>{line.quantity}</strong>
-                      {' · '}
                       {av.available <= 0
                         ? formatAvailabilityText(0, av.max)
                         : `עד ${av.available} פנויים לתאריך זה`}
                     </p>
                   </div>
-                  <Button variant="danger" className="w-full text-sm sm:w-auto" onClick={() => removeItemFromForm(index)} ariaLabel={`הסר ${line.itemName}`}>
-                    הסר
-                  </Button>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <div className="mx-auto inline-flex w-auto items-center overflow-hidden rounded-xl border-2 border-slate-300 bg-slate-50 sm:mx-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSetQty(qty - 1)}
+                        disabled={qty <= 1}
+                        className="flex h-11 w-11 items-center justify-center bg-slate-200 text-slate-800 transition-colors hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`הפחת כמות ${line.itemName}`}
+                      >
+                        <span className="text-lg font-bold">−</span>
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={String(qty)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!isValidQuantityDraft(val)) return;
+                          if (val === '') return;
+                          handleSetQty(val);
+                        }}
+                        className="min-h-11 w-16 border-0 bg-transparent py-1.5 text-center text-base font-semibold tabular-nums text-slate-900 focus:outline-none"
+                        aria-label={`כמות ${line.itemName}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSetQty(qty + 1)}
+                        disabled={qty >= av.available}
+                        className="flex h-11 w-11 items-center justify-center bg-slate-200 text-slate-800 transition-colors hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`הוסף כמות ${line.itemName}`}
+                      >
+                        <span className="text-lg font-bold">+</span>
+                      </button>
+                    </div>
+                    <Button
+                      variant="danger"
+                      className="w-full text-sm sm:w-auto"
+                      onClick={() => removeItemFromForm(index)}
+                      ariaLabel={`הסר ${line.itemName}`}
+                    >
+                      הסר
+                    </Button>
+                  </div>
                 </li>
               );
             })}
@@ -114,10 +167,10 @@ const OrderItemsEditCollapse = ({
                     <ItemImage
                       src={it.imageUrl}
                       alt={it.name}
-                      className="h-20 w-20 flex-shrink-0 self-end rounded-xl object-cover border-2 border-slate-200 shadow sm:self-auto"
+                      className="mx-auto h-20 w-20 flex-shrink-0 rounded-xl border-2 border-slate-200 object-cover shadow sm:mx-0"
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900">{it.name}</p>
+                    <div className="min-w-0 flex-1 text-center sm:text-right">
+                      <p className="break-words font-bold text-slate-900">{it.name}</p>
                       {it.notes?.trim() && (
                         <p className="mt-0.5 text-sm font-medium text-slate-600">{it.notes.trim()}</p>
                       )}
