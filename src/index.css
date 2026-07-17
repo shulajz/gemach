@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Heebo', sans-serif;
+  @apply antialiased text-gray-800;
+}
+
+/* Focus ring for accessibility (primary is teal) */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-teal-500;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Print: hide nav and non-essential UI on order confirmation */
+@media print {
+  header,
+  footer,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    max-width: none;
+  }
+}
+
+/* Force own compositing layer to avoid double-paint/ghosting in admin (sticky header + content) */
+.admin-content-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Custom scrollbar (optional, subtle) */
+@media (min-width: 1024px) {
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
+  }
+  .overflow-x-auto::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+}
