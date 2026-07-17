@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { signOut } from '../firebase/auth.js';
-import { useAuth } from '../hooks/useAuth.js';
-import Button from '../components/Button.jsx';
+import { useState } from "react";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { signOut } from "../firebase/auth.js";
+import { useAuth } from "../hooks/useAuth.js";
+import Button from "../components/Button.jsx";
 
 const navItems = [
-  { to: '/admin/dashboard', label: 'לוח בקרה' },
-  { to: '/admin/inventory', label: 'ניהול מלאי' },
-  { to: '/admin/orders', label: 'ניהול הזמנות' },
-  { to: '/admin/opening-schedule', label: 'לו״ז פתיחת גמ״ח' },
-  { to: '/admin/calendar', label: 'לוח אירועים' },
-  { to: '/admin/order-conflicts', label: 'בקרת עומסים' },
-  { to: '/admin/reports', label: 'דוחות' },
-  { to: '/admin/gallery', label: 'גלריית תמונות' },
-  { to: '/admin/important-info', label: 'הנחיות חשובות' },
+  { to: "/admin/dashboard", label: "לוח בקרה" },
+  { to: "/admin/inventory", label: "ניהול מלאי" },
+  { to: "/admin/orders", label: "ניהול הזמנות" },
+  { to: "/admin/opening-schedule", label: "לו״ז פתיחת גמ״ח" },
+  { to: "/admin/calendar", label: "לוח אירועים" },
+  { to: "/admin/order-conflicts", label: "בקרת עומסים" },
+  { to: "/admin/reports", label: "דוחות" },
+  { to: "/admin/gallery", label: "גלריית תמונות" },
+  { to: "/admin/important-info", label: "הנחיות חשובות" },
 ];
 
 const AdminLayout = () => {
@@ -23,7 +23,7 @@ const AdminLayout = () => {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/admin/login');
+    navigate("/admin/login");
   };
 
   return (
@@ -38,8 +38,18 @@ const AdminLayout = () => {
               aria-label="תפריט"
               aria-expanded={menuOpen}
             >
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
             <NavLink
@@ -53,13 +63,17 @@ const AdminLayout = () => {
             <span className="hidden rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-600 md:inline">
               {user?.email}
             </span>
-            <Button variant="secondary" onClick={handleLogout} ariaLabel="יציאה">
+            <Button
+              variant="secondary"
+              onClick={handleLogout}
+              ariaLabel="יציאה"
+            >
               יציאה
             </Button>
           </div>
         </div>
         <nav
-          className={`max-h-[70vh] overflow-y-auto overscroll-contain border-t border-gray-100 bg-white md:max-h-none md:overflow-visible md:border-t-0 ${menuOpen ? 'block' : 'hidden md:block'}`}
+          className={`max-h-[70vh] overflow-y-auto overscroll-contain border-t border-gray-100 bg-white md:max-h-none md:overflow-visible md:border-t-0 ${menuOpen ? "block" : "hidden md:block"}`}
           aria-label="ניווט מנהל"
         >
           <div className="mx-auto flex max-w-6xl flex-col gap-0 md:flex-row md:gap-1 md:px-4 md:py-2">
@@ -70,7 +84,9 @@ const AdminLayout = () => {
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
                   `rounded-xl px-4 py-3 text-sm font-semibold transition-all md:my-1 ${
-                    isActive ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                    isActive
+                      ? "bg-primary-600 text-white shadow-md"
+                      : "text-gray-600 hover:bg-gray-100"
                   }`
                 }
               >

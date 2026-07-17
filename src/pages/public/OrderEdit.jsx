@@ -7,9 +7,15 @@ import {
   updateOrderByCustomerLink,
   validateCustomerEditAccess,
 } from "../../firebase/orders.js";
-import { validateOrderForm, formatIsraeliPhone } from "../../utils/validation.js";
+import {
+  validateOrderForm,
+  formatIsraeliPhone,
+} from "../../utils/validation.js";
 import { getHebrewError } from "../../utils/errorsHe.js";
-import { formatAvailabilityText, isItemUnavailable } from "../../utils/formatAvailability.js";
+import {
+  formatAvailabilityText,
+  isItemUnavailable,
+} from "../../utils/formatAvailability.js";
 import {
   getQuantityDraft,
   isValidQuantityDraft,
@@ -27,10 +33,16 @@ import {
   getItemsForEventType,
   filterQuantitiesForEventType,
 } from "../admin/order-detail/helpers.js";
-import { EVENT_TYPES, getEventTypeLabel, EVENT_TYPE_NO_UTENSILS } from "../../constants/he.js";
+import {
+  EVENT_TYPES,
+  getEventTypeLabel,
+  EVENT_TYPE_NO_UTENSILS,
+} from "../../constants/he.js";
 
 const toDateStr = (d) =>
-  d instanceof Date ? d.toISOString().slice(0, 10) : (d || "").toString().slice(0, 10);
+  d instanceof Date
+    ? d.toISOString().slice(0, 10)
+    : (d || "").toString().slice(0, 10);
 
 const OrderEdit = () => {
   const { orderId } = useParams();
@@ -107,11 +119,15 @@ const OrderEdit = () => {
     () => getTabsForEventType(form.eventType),
     [form.eventType],
   );
-  const currentTab = activeTabIndex != null ? tabsForEventType[activeTabIndex] : null;
+  const currentTab =
+    activeTabIndex != null ? tabsForEventType[activeTabIndex] : null;
 
   useEffect(() => {
     if (!tabsForEventType.length) return;
-    if (activeTabIndex != null && activeTabIndex > tabsForEventType.length - 1) {
+    if (
+      activeTabIndex != null &&
+      activeTabIndex > tabsForEventType.length - 1
+    ) {
       setActiveTabIndex(null);
     }
   }, [tabsForEventType, activeTabIndex]);
@@ -147,7 +163,9 @@ const OrderEdit = () => {
   const handleMobileTabToggle = (idx) => {
     setActiveTabIndex(idx);
     setExpandedTabIndices((prev) =>
-      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx].sort((a, b) => a - b),
+      prev.includes(idx)
+        ? prev.filter((i) => i !== idx)
+        : [...prev, idx].sort((a, b) => a - b),
     );
   };
 
@@ -170,13 +188,19 @@ const OrderEdit = () => {
         <div className="min-w-0 flex-1">
           <p className="text-lg font-bold text-gray-900">{item.name}</p>
           {item.notes?.trim() && (
-            <p className="mt-1 text-sm font-medium text-gray-600">{item.notes.trim()}</p>
+            <p className="mt-1 text-sm font-medium text-gray-600">
+              {item.notes.trim()}
+            </p>
           )}
-          <p className={`mt-1 text-sm font-bold ${isItemUnavailable(av.available) ? "text-gray-600" : "text-teal-700"}`}>
+          <p
+            className={`mt-1 text-sm font-bold ${isItemUnavailable(av.available) ? "text-gray-600" : "text-teal-700"}`}
+          >
             {formatAvailabilityText(av.available, av.max)}
           </p>
           {inCart > 0 && (
-            <p className="mt-0.5 text-sm font-semibold text-teal-800">בסל: {inCart}</p>
+            <p className="mt-0.5 text-sm font-semibold text-teal-800">
+              בסל: {inCart}
+            </p>
           )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto">
@@ -195,7 +219,9 @@ const OrderEdit = () => {
               inputMode="numeric"
               pattern="[0-9]*"
               value={inputValue}
-              onChange={(e) => handleQuantityInputChange(item.id, e.target.value)}
+              onChange={(e) =>
+                handleQuantityInputChange(item.id, e.target.value)
+              }
               onBlur={() => handleQuantityInputBlur(item.id, maxQty)}
               placeholder="0"
               className="min-h-11 w-16 border-0 bg-transparent py-2 text-center text-base font-semibold tabular-nums text-gray-900 focus:outline-none"
@@ -229,7 +255,8 @@ const OrderEdit = () => {
     const max = item ? Number(item.maxQuantity) || 0 : 0;
     const reserved = Number(reservations[itemId]) || 0;
     const currentOrderQty =
-      (order?.items || []).find((line) => line.itemId === itemId)?.quantity || 0;
+      (order?.items || []).find((line) => line.itemId === itemId)?.quantity ||
+      0;
     return { max, available: Math.max(0, max - reserved + currentOrderQty) };
   };
 
@@ -253,32 +280,49 @@ const OrderEdit = () => {
   const handleQuantityInputBlur = (itemId, maxQty) => {
     setPendingQuantities((prev) => {
       if (!Object.prototype.hasOwnProperty.call(prev, itemId)) return prev;
-      return { ...prev, [itemId]: normalizeQuantityDraft(prev[itemId], maxQty) };
+      return {
+        ...prev,
+        [itemId]: normalizeQuantityDraft(prev[itemId], maxQty),
+      };
     });
   };
 
   const setEditQty = (itemId, delta, maxQty) => {
     const inCart = quantities[itemId] || 0;
-    const current = parseQuantityInput(getQuantityDraft(pendingQuantities, itemId, inCart), maxQty);
+    const current = parseQuantityInput(
+      getQuantityDraft(pendingQuantities, itemId, inCart),
+      maxQty,
+    );
     const next = Math.max(0, Math.min(maxQty, current + delta));
-    setPendingQuantity(itemId, next === 0 ? '' : String(next));
+    setPendingQuantity(itemId, next === 0 ? "" : String(next));
   };
 
   const handleApplyQty = (itemId, maxQty) => {
     const inCart = quantities[itemId] || 0;
-    const qty = parseQuantityInput(getQuantityDraft(pendingQuantities, itemId, inCart), maxQty);
+    const qty = parseQuantityInput(
+      getQuantityDraft(pendingQuantities, itemId, inCart),
+      maxQty,
+    );
     setQuantities((prev) => ({ ...prev, [itemId]: qty }));
-    setPendingQuantities((prev) => ({ ...prev, [itemId]: qty === 0 ? '' : String(qty) }));
+    setPendingQuantities((prev) => ({
+      ...prev,
+      [itemId]: qty === 0 ? "" : String(qty),
+    }));
   };
 
   const handleChange = (field, value) => {
     const nextValue = field === "phone" ? formatIsraeliPhone(value) : value;
     if (field === "eventType" && nextValue !== form.eventType) {
-      setQuantities((prev) => filterQuantitiesForEventType(prev, items, nextValue));
+      setQuantities((prev) =>
+        filterQuantitiesForEventType(prev, items, nextValue),
+      );
       setPendingQuantities((prev) => {
         const filtered = filterQuantitiesForEventType(prev, items, nextValue);
         return Object.fromEntries(
-          Object.entries(filtered).map(([id, qty]) => [id, qty === 0 ? "" : String(qty)]),
+          Object.entries(filtered).map(([id, qty]) => [
+            id,
+            qty === 0 ? "" : String(qty),
+          ]),
         );
       });
     }
@@ -293,7 +337,10 @@ const OrderEdit = () => {
       .map((item) => ({
         itemId: item.id,
         itemName: item.name,
-        quantity: Math.min(quantities[item.id] || 0, availability(item.id).available),
+        quantity: Math.min(
+          quantities[item.id] || 0,
+          availability(item.id).available,
+        ),
       }))
       .filter((line) => line.quantity > 0);
     if (!orderItems.length) formErrors.items = "נא לבחור לפחות פריט אחד";
@@ -411,13 +458,17 @@ const OrderEdit = () => {
                       className="sr-only"
                       aria-label={getEventTypeLabel(type)}
                     />
-                    <span className="break-words">{getEventTypeLabel(type)}</span>
+                    <span className="break-words">
+                      {getEventTypeLabel(type)}
+                    </span>
                   </label>
                 );
               })}
             </div>
             {errors.eventType && (
-              <p className="mt-1.5 text-sm font-medium text-red-600">{errors.eventType}</p>
+              <p className="mt-1.5 text-sm font-medium text-red-600">
+                {errors.eventType}
+              </p>
             )}
           </div>
         </div>
@@ -456,7 +507,12 @@ const OrderEdit = () => {
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </button>
                 {isExpanded && (
@@ -467,7 +523,9 @@ const OrderEdit = () => {
                     className="space-y-4 bg-teal-50/30 p-3"
                   >
                     {tabItems.length === 0 ? (
-                      <p className="text-sm text-gray-600">אין פריטים בקטגוריה זו</p>
+                      <p className="text-sm text-gray-600">
+                        אין פריטים בקטגוריה זו
+                      </p>
                     ) : (
                       tabItems.map((item) => renderItemCard(item))
                     )}
@@ -476,7 +534,9 @@ const OrderEdit = () => {
               </div>
             );
           })}
-          {errors.items && <p className="text-sm font-medium text-red-600">{errors.items}</p>}
+          {errors.items && (
+            <p className="text-sm font-medium text-red-600">{errors.items}</p>
+          )}
         </div>
 
         {/* Desktop — category tabs */}
@@ -506,7 +566,11 @@ const OrderEdit = () => {
 
         {/* Desktop — items (only after category selected) */}
         {activeTabIndex != null && (
-          <div className="hidden md:block" role="tabpanel" aria-label={currentTab?.label}>
+          <div
+            className="hidden md:block"
+            role="tabpanel"
+            aria-label={currentTab?.label}
+          >
             <div
               ref={desktopItemsScrollRef}
               className="max-h-[60vh] min-h-[20rem] space-y-4 overflow-y-auto overscroll-contain pr-1"
@@ -516,7 +580,11 @@ const OrderEdit = () => {
               ) : (
                 itemsInCurrentTab.map((item) => renderItemCard(item))
               )}
-              {errors.items && <p className="text-sm font-medium text-red-600">{errors.items}</p>}
+              {errors.items && (
+                <p className="text-sm font-medium text-red-600">
+                  {errors.items}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -526,13 +594,21 @@ const OrderEdit = () => {
         <h2 className="mb-4 text-xl font-bold text-teal-900">סיכום פריטים</h2>
         <ul className="space-y-2">
           {cartSummary.map(({ item, qty }) => (
-            <li key={item.id} className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+            <li
+              key={item.id}
+              className="rounded-lg border border-teal-100 bg-teal-50/40 p-3"
+            >
               {item.name} - {qty}
             </li>
           ))}
         </ul>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
-          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => navigate("/")}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={() => navigate("/")}
+          >
             ביטול
           </Button>
           <Button type="submit" disabled={saving} className="w-full sm:w-auto">

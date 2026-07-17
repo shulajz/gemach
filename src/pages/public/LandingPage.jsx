@@ -579,7 +579,9 @@ const LandingPage = () => {
                             aria-label={getEventTypeLabel(type)}
                             aria-disabled={isDisabled}
                           />
-                          <span className="break-words">{getEventTypeLabel(type)}</span>
+                          <span className="break-words">
+                            {getEventTypeLabel(type)}
+                          </span>
                         </label>
                       );
                     })}
@@ -599,8 +601,8 @@ const LandingPage = () => {
                       className="mt-1.5 text-sm font-medium text-gray-600"
                       role="status"
                     >
-                      ניתן לבחור פריטי עיצוב ואביזרים בלבד — ללא צלחות, סכו&quot;ם
-                      וכוסות
+                      ניתן לבחור פריטי עיצוב ואביזרים בלבד — ללא צלחות,
+                      סכו&quot;ם וכוסות
                     </p>
                   )}
                   {errors.eventType && (
